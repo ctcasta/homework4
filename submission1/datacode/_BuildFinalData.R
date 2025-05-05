@@ -1,32 +1,19 @@
-
-# Meta --------------------------------------------------------------------
-# Author:        Ian McCarthy
-# Date Created:  7/8/2019
-# Date Edited:   1/24/2022
-# Notes:         R file to build Medicare Advantage dataset
-
-
-
-# Preliminaries -----------------------------------------------------------
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, stringr, readxl, data.table, gdata)
+pacman::p_load(ggplot2, lubridate, stringr, readxl, data.table, gdata, tidyverse, dplyr)
+
+# call individual scripts 
+###source("submission_1/data-code/1_Plan_Data.R")
+###source("submission_1/data-code/2_Plan_Characteristics.R")
+###source("submission_1/data-code/3_Service_Areas.R")
+###source("submission_1/data-code/4_Penetration_Files.R")
+###source("submission_1/data-code/5_Star_Ratings.R")
+###source("submission_1/data-code/6_Risk_Rebates.R")
+###source("submission_1/data-code/7_MA_Benchmark.R")
+###source("submission_1/data-code/8_FFS_Costs.R")
 
 
 
-# Call individual scripts -------------------------------------------------
-
-source("data-code/1_Plan_Data.R")
-source("data-code/2_Plan_Characteristics.R")
-source("data-code/3_Service_Areas.R")
-source("data-code/4_Penetration_Files.R")
-source("data-code/5_Star_Ratings.R")
-source("data-code/6_Risk_Rebates.R")
-source("data-code/7_MA_Benchmark.R")
-source("data-code/8_FFS_Costs.R")
-
-
-
-# Tidy data ---------------------------------------------------------------
+# tidy data 
 full.ma.data <- read_rds("data/output/full_ma_data.rds")
 contract.service.area <- read_rds("data/output/contract_service_area.rds")
 star.ratings <- read_rds("data/output/star_ratings.rds")
@@ -36,6 +23,7 @@ risk.rebate.final <- read_rds("data/output/risk_rebate.rds")
 benchmark.final <- read_rds("data/output/ma_benchmark.rds") %>%
   mutate(ssa=as.double(ssa))
 ffs.costs.final <- read_rds("data/output/ffs_costs.rds")
+
 
 final.data <- full.ma.data %>%
   inner_join(contract.service.area %>% 
@@ -51,8 +39,9 @@ final.data <- final.data %>%
                select(-contract_name, -org_type, -org_marketing), 
              by=c("contractid", "year")) %>%
   left_join( ma.penetration.data %>% ungroup() %>% select(-ssa) %>%
-               rename(state_long=state, county_long=county), 
+               dplyr::rename(state_long=state, county_long=county), 
              by=c("fips", "year"))
+
 
 # calculate star rating (Part C rating if plan doesn't offer part D, otherwise Part D rating if available)
 final.data <- final.data %>% ungroup() %>%
@@ -64,10 +53,9 @@ final.data <- final.data %>% ungroup() %>%
              TRUE ~ NA_real_
            ))
 
-
-final.state <- final.data %>% 
+  final.state <- final.data %>% 
   group_by(state) %>% 
-  summarize(state_name=last(state_long, na.rm=TRUE))
+  summarize(state_name = tail(na.omit(state_long), 1)) ### I CHANGED THIS 
 
 final.data <- final.data %>%
   left_join(final.state,
@@ -131,6 +119,3 @@ final.data <- final.data %>%
 
 # save final dataset
 write_rds(final.data,"data/output/final_ma_data.rds")
-
-
-
